@@ -1,0 +1,160 @@
+<?php
+
+/**
+ * Implements hook_menu().
+ */
+function tt_menu() {
+  $items = array();
+
+  // add tab to enter PTA that needs approval ('STANFORD_R25_MENU_PATH', 'admin/config/system/stanford_r25');
+
+  $items[STANFORD_R25_MENU_PATH . '/pta'] = array(
+    'title' => t('PTA Numbers'),
+    'type' => MENU_LOCAL_TASK,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('_tt_pta'),
+    'access arguments' => array('administer stanford r25'),
+    'file' => 'tt.admin.inc',
+    'weight' => -5,
+  );
+
+  return $items;
+}
+
+function tt_form_stanford_r25_reservation_alter(&$form, &$form_state, $form_id) {
+  $form['stanford_r25_booking_reason']['#title'] = 'Event Title';
+  $form['stanford_r25_booking_headcount']['#type'] = 'hidden';
+  $form['stanford_r25_booking_headcount']['#value'] = 1;
+  $form['submit']['#prefix'] = '<span>By clicking the Reserve button, I confirm that I have read and agree to the <a href="https://uit.stanford.edu/service/techtraining/facilityrentalpolicy">Facility Rental Policy</a></span><br />';
+  $form['stanford_r25_booking_attr144']['#suffix'] = '<div class="form-item"><span class="description">E.g., 1234567-123-ABCDE (Case sensitive)</span></div>';
+  $form['stanford_r25_booking_attr182']['#suffix'] = '<div class="form-item"><span class="description">E.g., Mac or PC</span></div>';
+  $form['stanford_r25_booking_attr182']['#maxlength'] = 80;
+  array_unshift($form['#validate'], 'tt_stanford_r25_pta_validate');
+  $form['#submit'][] = 'tt_stanford_r25_reservation_submit';
+}
+
+// Remove the Headcount: 2 (which is hard-coded) from the tool tip
+function tt_stanford_r25_contact_alter(&$data) {
+  $data = str_replace('<br />Headcount: 2', '', $data);
+  $data = str_replace('<br />Headcount:', '', $data);
+}
+
+function tt_stanford_r25_pta_validate($form, &$form_state) {
+  if (preg_match('/;/', $form_state['values']['stanford_r25_booking_reason'])) {
+      form_set_error('stanford_r25_booking_reason', t('Please do not include the ; character in the title of the event.'));
+  }
+
+  $form_state['values']['stanford_r25_booking_attr144'] = trim($form_state['values']['stanford_r25_booking_attr144']);
+  if (!(preg_match('/^(\d{7})\-(\d.*)\-([A-Z]{5})$/', $form_state['values']['stanford_r25_booking_attr144']))) {
+      form_set_error('stanford_r25_booking_attr144', t('Invalid PTA Format. The correct format is Project-Task-Award (e.g. 1234567-123-ABCDE)'));
+  }
+}
+
+// Remove the Sender and other headers so emails only appear to come from Tech Training, and not the website admins.
+function tt_mail_alter(&$message) {
+  if (preg_match('/stanford_r25/', $message['id'])) { 
+    unset($message['headers']['Sender']);
+    unset($message['headers']['Errors-To']);
+    unset($message['headers']['Return-Path']);
+    $message['headers']['Reply-To'] = 'tt-questions@lists.stanford.edu';
+  }
+}
+
+// Sends a Tech Training specific confirmation email to the requestor, for rooms that have Postprocess Booking enabled.
+function tt_stanford_r25_reservation_submit($form, &$form_state) {
+  if (!empty($form_state['storage']['stanford_r25_postprocess']['room'])) {
+    global $base_url;
+    global $user;
+    $startdate = DateTime::createFromFormat(DATE_W3C, $form_state['storage']['stanford_r25_postprocess']['dates']['start']);
+    $enddate = DateTime::createFromFormat(DATE_W3C, $form_state['storage']['stanford_r25_postprocess']['dates']['end']);
+    $res_usermail = $user->mail;
+    $res_username = $user->name;
+
+    $provostial_pta = false;
+    $pta_field = _tt_pta_attribute($form_state['storage']['stanford_r25_postprocess']['room']);
+    if ($pta_field) {
+      $pta_val = '';
+      if (!empty($form_state['values']['stanford_r25_booking_attr'.$pta_field])) {
+        $pta_val = $form_state['values']['stanford_r25_booking_attr'.$pta_field];
+      }
+      $provostial_pta = _tt_provostial_pta_val($pta_val);
+    }
+    if ($provostial_pta) {
+      $subject = 'Rental Request - ' . $form_state['storage']['stanford_r25_postprocess']['room']['display_name'] . ' - ' . $form_state['values']['stanford_r25_booking_reason'];
+      $provost_pta_body = variable_get('stanford_r25_provostial_pta',
+        array('value' => '', 'format' => filter_default_format()));
+      $body[] = $provost_pta_body['value'];
+    } else {
+      $subject = 'Rental Receipt - ' . $form_state['storage']['stanford_r25_postprocess']['room']['display_name'] . ' - ' . $form_state['values']['stanford_r25_booking_reason'];
+      $body[] = 'Hi ' . $res_username . ',';
+      $body[] = 'Thank you for your reservation of ' . $form_state['storage']['stanford_r25_postprocess']['room']['display_name'] . ' on ' . $startdate->format("l, F j, Y") . ' from ' . $startdate->format("g:i a") . ' to ' . $enddate->format("g:i a") . '.';
+      $body[] = 'You can view or cancel your reservation at: ' . $base_url . '/r25/' . $form_state['storage']['stanford_r25_postprocess']['room']['machine_name'] . '/calendar';
+      $body[] = 'If this is your first time renting a Technology Training facility, please call (650) 723-4391 or email tt-questions@lists.stanford.edu to schedule a required orientation of the room.';
+      $body[] = 'The goal of this orientation is to provide you with:';
+      $body[] = '<ol><li>the access code for the entry door</li><li>instructions for operating audio-visual equipment in the room</li><li>trouble shooting resources.</li></ol>';
+      $body[] = 'We look forward to working together with you to ensure that your event is successful.';
+      $body[] = 'Please read our facility rental policy at: https://uit.stanford.edu/service/facilityrentals/policy';
+      $body[] = 'For any questions, please submit a Help ticket: https://stanford.service-now.com/services?id=get_help&cmdb_ci=5e560e9613e3e240d08ebda12244b01e';
+      $body[] = 'Thank you,';
+      $body[] = 'University IT Technology Training<br>http://techtraining.stanford.edu';
+    }
+    $params = array(
+      'body' => $body,
+      'subject' => $subject
+    );
+    drupal_mail('stanford_r25', 'receipt', $res_usermail, language_default(), $params, variable_get('stanford_r25_from_email', variable_get('site_mail')));
+  }
+}
+
+function _tt_pta_attribute($room_info = []) {
+  $pta_attr = false;
+  if (!empty($room_info['event_attribute_fields']) &&
+    is_array($room_info['event_attribute_fields'])) {
+    foreach ($room_info['event_attribute_fields'] as $key => $attrs) {
+      if (!empty($attrs['name']) && is_string($attrs['name']) &&
+        strpos($attrs['name'],"PTA Number") !== false) {
+        $pta_attr = $key;
+      }
+    }
+  }
+  return $pta_attr;
+}
+
+function _tt_provostial_pta_val($pta_val = '') {
+  $provostial = false;
+  if (!empty($pta_val)) {
+    $ptas = variable_get('stanford_r25_room_pta_numbers', '');
+    if (!empty($ptas)) {
+      if (strpos($ptas, $pta_val) !== FALSE) {
+        $provostial = true;
+      }
+    }
+  }
+  return $provostial;
+}
+
+function tt_stanford_r25_request_alter(&$xml_str, $room_info) {
+  $pta_field = _tt_pta_attribute($room_info);
+  if ($pta_field) {
+    $pta_val = '';
+    $attr_index1 = strpos($xml_str,
+      "<r25:attribute_id>" . strval($pta_field) . "</r25:attribute_id>");
+    if ($attr_index1 !== FALSE) {
+      $attr_index2 = strpos($xml_str, "<r25:attribute_value>",
+        $attr_index1);
+      if ($attr_index2 !== FALSE) {
+        $attr_index3 = strpos($xml_str, "</r25", $attr_index2);
+        $pta_start = $attr_index2 + 21;
+        if ($attr_index3 !== FALSE && $attr_index3 > $pta_start) {
+          $pta_val = substr($xml_str, $pta_start,
+            $attr_index3 - $pta_start);
+        }
+      }
+    }
+    if (_tt_provostial_pta_val($pta_val)) {
+      // make the reservation tentative
+      $xml_str = str_replace("<r25:state>2</r25:state>",
+        "<r25:state>1</r25:state>", $xml_str);
+    }
+  }
+}

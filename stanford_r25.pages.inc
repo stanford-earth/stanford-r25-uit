@@ -532,6 +532,9 @@ function stanford_r25_reservation_submit($form, &$form_state) {
   }
   $xml = str_replace('[r25_created_by]', '<span>Self service reservation made by ' . $res_username . ' - <a href="mailto:' . $res_usermail . '">click to contact by email.</a></span>', $xml);
 
+  // give modules a chance to modify the request
+  drupal_alter('stanford_r25_request',$xml, $room);
+
   // send the request to our api function
   $result = _stanford_r25_api_call('reserve', NULL, NULL, $xml);
 
