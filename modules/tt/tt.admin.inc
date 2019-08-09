@@ -13,7 +13,7 @@ function _tt_get_stored_pta_number($index) {
 function _tt_pta($form, &$form_state)
 {
 
-// start with an instructive string
+  // start with an instructive string
   $markup_str = 'Shirley, please add instructions here ';
 
   $form['description'] = array(
@@ -36,7 +36,6 @@ function _tt_pta($form, &$form_state)
       '#title' => t('PTA number '),
       '#description' => t('Enter provostial PTA number(s) that require approval for reservation'),
       '#default_value' => _tt_get_stored_pta_number($i),
-      //'#default_value' => variable_get('stanford_r25_room_pta_numbers', '1095428-220-AABPK'),
       '#required' => FALSE,
     );
   }
@@ -45,16 +44,6 @@ function _tt_pta($form, &$form_state)
     '#type'  => 'submit',
     '#value' => t('Add another PTA'),
     '#submit' => array('_tt_pta_add_pta'),
-  );
-
-  /*
-  // PTA numbers that needs approval
-  $form['stanford_r25_room_pta_numbers'] = array(
-    '#type' => 'textfield',
-    '#title' => t('PTA numbers '),
-    '#description' => t('Enter provostial PTA number(s) that require approval for reservation'),
-    '#default_value' => variable_get('stanford_r25_room_pta_numbers', '1095428-220-AABPK'),
-    '#required' => FALSE,
   );
 
   // email message to requestor if they are using Provostial PTA to be added by Tech Training
