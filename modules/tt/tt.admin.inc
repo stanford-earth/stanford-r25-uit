@@ -56,7 +56,6 @@ function _tt_pta($form, &$form_state)
     '#default_value' => variable_get('stanford_r25_room_pta_numbers', '1095428-220-AABPK'),
     '#required' => FALSE,
   );
-  */
 
   // email message to requestor if they are using Provostial PTA to be added by Tech Training
   $default_body = "Your core rental request has been received. " .
