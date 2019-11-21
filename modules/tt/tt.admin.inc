@@ -14,7 +14,7 @@ function _tt_pta($form, &$form_state)
 {
 
   // start with an instructive string
-  $markup_str = 'Shirley, please add instructions here ';
+  $markup_str = 'Reservations with the following PTA(s) require approval.';
 
   $form['description'] = array(
     '#markup' => t($markup_str),
@@ -33,8 +33,8 @@ function _tt_pta($form, &$form_state)
     );
     $form['pta_numbers'][$i]['stanford_r25_room_pta_numbers'] = array(
       '#type' => 'stanford_pta',
-      '#title' => t('PTA number '),
-      '#description' => t('Enter provostial PTA number(s) that require approval for reservation'),
+      '#title' => t('PTA'),
+      '#description' => t('Enter the PTA that requires approval for reservation.'),
       '#default_value' => _tt_get_stored_pta_number($i),
       '#required' => FALSE,
     );
@@ -57,8 +57,8 @@ function _tt_pta($form, &$form_state)
     array('value' => $default_body, 'format' => filter_default_format()));
   $form['stanford_r25_provostial_pta'] = array(
     '#type' => 'text_format',
-    '#title' => t('Message when using Provostial PTA'),
-    '#description' => t('Add text .'),
+    '#title' => t('Message emailed to requestor using above PTA'),
+    '#description' => t(' '),
     '#default_value' => $default_provost_pta['value'],
     '#format' => $default_provost_pta['format'],
   );
