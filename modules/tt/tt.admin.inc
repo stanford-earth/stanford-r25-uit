@@ -2,7 +2,7 @@
 
 function _tt_get_stored_pta_number($index) {
   $container = variable_get('stanford_r25_room_pta_numbers',
-    array(1 => array('stanford_r25_room_pta_numbers' => '1095428-220-AABPK')));
+    array(1 => array('stanford_r25_room_pta_numbers' => ' ')));
   if ($index > count($container)) {
     $index = 1;
   }
